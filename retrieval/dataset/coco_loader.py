@@ -13,16 +13,21 @@ class COCOLoader:
         anno = json.load(open(anno_path))
         box_set = {}
         category_set = {}
+        cid_to_idx = {}
 
         for i, obj in enumerate(anno['annotations']):
             im_id = obj['image_id']
+            cid_to_idx[obj['category_id']] = 0
             if im_id not in box_set:
                 box_set[im_id] = []
                 category_set[im_id] = []
 
+        for i, k in enumerate(cid_to_idx):
+            cid_to_idx[k] = i
+
         for i, obj in enumerate(anno['annotations']):
             im_id = obj['image_id']
-            category = obj['category_id']
+            category = cid_to_idx[obj['category_id']]
 
             bbox = np.array(obj['bbox'])
             xmin = bbox[0]
