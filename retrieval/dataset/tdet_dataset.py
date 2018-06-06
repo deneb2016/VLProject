@@ -71,7 +71,7 @@ class TDetDataset(data.Dataset):
 
         image_level_label = torch.zeros(80)
         for label in gt_categories:
-            image_level_label[label] = 1.0
+            image_level_label[label - 1] = 1.0
         return data, gt_boxes, gt_categories, image_level_label, height_scale, width_scale, raw_img, id, loader_index
 
     def get_raw_data(self, index):
