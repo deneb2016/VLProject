@@ -35,10 +35,10 @@ class COCOLoader:
         for i, img in enumerate(anno['images']):
             data = {}
             id = img['id']
-            if len(box_set[id]) == 0:
+            if id not in box_set or len(box_set[id]) == 0:
                 continue
 
-            if len(category_set[id]) == 0:
+            if id not in category_set or len(category_set[id]) == 0:
                 continue
 
             data['id'] = id
