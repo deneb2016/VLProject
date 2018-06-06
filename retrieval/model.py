@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Embedding_VGG(nn.Module):
+class FeatureExtractor(nn.Module):
     def __init__(self, base_model_path):
-        super(Embedding_VGG, self).__init__()
+        super(FeatureExtractor, self).__init__()
         self.model_path = base_model_path
 
     def init_modules(self):
@@ -15,20 +15,17 @@ class Embedding_VGG(nn.Module):
         state_dict = torch.load(self.model_path)
         vgg.load_state_dict({k: v for k, v in state_dict.items() if k in vgg.state_dict()})
 
-        self.base = nn.Sequential(*list(vgg.features._modules.values())[:-1])
+        self.base = nn.Sequential(*list(vgg.features._modules.values())[:])
+        self.fc = vgg.classifier[:-2]
         self.gap = nn.AdaptiveAvgPool2d(1)
 
         # Fix the layers before conv3:
         for layer in range(len(self.base)):
             for p in self.base[layer].parameters(): p.requires_grad = False
 
-    def forward(self, im_data, query_img):
+    def forward(self, im_data):
         base_feat = self.base(im_data)
-        pooled_feat = self.gap(base_feat)
-        avg_feat = pooled_feat.mean(0)
+        gap_feat = self.gap(base_feat)
+        fc_feat = self.fc(base_feat.view(base_feat.size(0), -1))
 
-        #feat_vectors = base_feat.permute(0, 2, 3, 1).contiguous().view(-1, 512)
-
-
-
-        return avg_feat, self.base(query_img)
+        return gap_feat, fc_feat

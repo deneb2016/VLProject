@@ -17,7 +17,7 @@ VOC_CLASSES = [
 
 
 class VOCLoader:
-    def __init__(self, root, image_sets, proposal_path):
+    def __init__(self, root, image_sets):
         self.items = []
         self.num_classes = 0
         self.name_to_index = dict(zip(VOC_CLASSES, range(len(VOC_CLASSES))))
@@ -48,7 +48,6 @@ class VOCLoader:
                 data['boxes'] = np.array(box_set)
                 data['categories'] = np.array(category_set, np.long)
                 data['img_full_path'] = os.path.join(rootpath, 'JPEGImages', line.strip() + '.jpg')
-                data['proposal_path'] = os.path.join(proposal_path, '%s.npy' % line.strip())
                 self.items.append(data)
 
         print('dataset loading complete')

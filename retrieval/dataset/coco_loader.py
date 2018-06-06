@@ -6,7 +6,7 @@ from scipy.io import loadmat
 
 
 class COCOLoader:
-    def __init__(self, anno_path, img_path, proposal_path):
+    def __init__(self, anno_path, img_path):
         self.items = []
 
         print('dataset loading...' + anno_path)
@@ -42,7 +42,6 @@ class COCOLoader:
             data['boxes'] = np.array(box_set[id])
             data['categories'] = np.array(category_set[id], np.long)
             data['img_full_path'] = img_path + img['file_name']
-            data['proposal_path'] = os.path.join(proposal_path, '%012d.npy' % id)
             self.items.append(data)
 
         print('dataset loading complete')
