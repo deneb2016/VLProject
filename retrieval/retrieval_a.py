@@ -35,27 +35,10 @@ def eval():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    source_val_dataset = TDetDataset(dataset_names=['coco60_val'], training=False, img_scale=args.img_scale, keep_aspect_ratio=args.keep_aspect)
-    target_val_dataset = TDetDataset(dataset_names=['voc07_test'], training=False, img_scale=args.img_scale, keep_aspect_ratio=args.keep_aspect)
+    val_dataset = TDetDataset(dataset_names=['coco2017_val'], training=False, img_scale=args.img_scale, keep_aspect_ratio=args.keep_aspect)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=args.bs, num_workers=args.num_workers, collate_fn=tdet_collate, pin_memory=True)
 
-    source_val_dataloader = torch.utils.data.DataLoader(source_val_dataset, batch_size=args.bs, num_workers=args.num_workers, collate_fn=tdet_collate, pin_memory=True)
-    target_val_dataloader = torch.utils.data.DataLoader(target_val_dataset, batch_size=args.bs, num_workers=args.num_workers, collate_fn=tdet_collate, pin_memory=True)
-
-    load_name = os.path.abspath(args.model_path)
-    print("loading checkpoint %s" % (load_name))
-    checkpoint = torch.load(load_name)
-
-    # initilize the network here.
-    if checkpoint['net'] == 'CLS_VGG':
-        model = TDetClassifierVGG()
-    else:
-        print("network is not defined")
-        pdb.set_trace()
-
-    model.create_architecture()
-    model.load_state_dict(checkpoint['model'])
-    print("loaded checkpoint %s" % (load_name))
-
+    feature_extractor = FeatureExtractor('./data/pretrained_model/vgg16_caffe.pth')
     output_file_name = os.path.join(output_dir, 'eval_{}_{}_{}.txt'.format(checkpoint['net'], checkpoint['session'], checkpoint['iterations']))
     output_file = open(output_file_name, 'w')
     output_file.write(str(args))

@@ -35,8 +35,11 @@ class COCOLoader:
         for i, img in enumerate(anno['images']):
             data = {}
             id = img['id']
-            assert id in box_set and len(box_set[id]) > 0
-            assert id in category_set and len(category_set[id]) > 0
+            if len(box_set[id]) == 0:
+                continue
+
+            if len(category_set[id]) == 0:
+                continue
 
             data['id'] = id
             data['boxes'] = np.array(box_set[id])
