@@ -10,23 +10,30 @@ from dataset.voc_loader import VOCLoader
 
 
 class TDetDataset(data.Dataset):
-    def __init__(self, dataset_names, training, img_scale, keep_aspect_ratio=False):
+    def __init__(self, dataset_name, training, img_scale, keep_aspect_ratio=False):
         self.training = training
         self.img_scale = img_scale
         self.keep_aspect_ratio = keep_aspect_ratio
-        self._dataset_loaders = []
+        self.per_class = [[] for i in range(80)]
 
-        for name in dataset_names:
-            if name == 'coco2017train':
-                self._dataset_loaders.append(COCOLoader('./data/coco/annotations/instances_train2017.json', './data/coco/images/train2017/'))
-            elif name == 'coco2017val':
-                self._dataset_loaders.append(COCOLoader('./data/coco/annotations/instances_val2017.json', './data/coco/images/val2017/'))
+        if dataset_name == 'coco2017train':
+            self._dataset_loader = COCOLoader('./data/coco/annotations/instances_train2017.json', './data/coco/images/train2017/')
+        elif dataset_name == 'coco2017val':
+            self._dataset_loader = COCOLoader('./data/coco/annotations/instances_val2017.json', './data/coco/images/val2017/')
 
-            else:
-                print('@@@@@@@@@@ undefined dataset @@@@@@@@@@@')
+        else:
+            print('@@@@@@@@@@ undefined dataset @@@@@@@@@@@')
+
+        for i in range(len(self._dataset_loader)):
+            here = self._dataset_loader.items[i]
+            for cls in here['categories']:
+                if len(self.per_class[cls]) > 0 and self.per_class[cls][-1] == i:
+                    continue
+                else:
+                    self.per_class[cls].append(i)
 
     def __getitem__(self, index):
-        im, gt_boxes, gt_categories, id, loader_index = self.get_raw_data(index)
+        im, gt_boxes, gt_categories, id = self.get_raw_data(index)
         raw_img = im.copy()
 
         # rgb -> bgr
@@ -71,19 +78,17 @@ class TDetDataset(data.Dataset):
 
         image_level_label = torch.zeros(80)
         for label in gt_categories:
-            image_level_label[label - 1] = 1.0
-        return data, gt_boxes, gt_categories, image_level_label, height_scale, width_scale, raw_img, id, loader_index
+            image_level_label[label] = 1.0
+        return data, gt_boxes, gt_categories, image_level_label, height_scale, width_scale, raw_img, id
+
+    def len_per_cls(self, cls):
+        return len(self.per_class[cls])
+
+    def get_from_cls(self, cls, index):
+        return self.__getitem__(self.per_class[cls][index])
 
     def get_raw_data(self, index):
-        here = None
-        loader_index = 0
-        for loader in self._dataset_loaders:
-            if index < len(loader):
-                here = loader.items[index]
-                break
-            else:
-                index -= len(loader)
-                loader_index += 1
+        here = self._dataset_loader.items[index]
 
         assert here is not None
         im = imread(here['img_full_path'])
@@ -96,13 +101,10 @@ class TDetDataset(data.Dataset):
         gt_boxes = here['boxes'].copy()
         gt_categories = here['categories'].copy()
         id = here['id']
-        return im, gt_boxes, gt_categories, id, loader_index
+        return im, gt_boxes, gt_categories, id
 
     def __len__(self):
-        tot_len = 0
-        for loader in self._dataset_loaders:
-            tot_len += len(loader)
-        return tot_len
+        return len(self._dataset_loader)
 
 
 def tdet_collate(batch):
@@ -125,17 +127,15 @@ def tdet_collate(batch):
     width_scales = []
     raw_imgs = []
     ids = []
-    loader_indices = []
 
     for sample in batch:
         imgs.append(sample[0])
         gt_boxes.append(sample[1])
         gt_categories.append(sample[2])
-        image_level_labels.append(sample[4])
-        height_scales.append(sample[5])
-        width_scales.append(sample[6])
-        raw_imgs.append(sample[7])
-        ids.append(sample[8])
-        loader_indices.append(sample[9])
+        image_level_labels.append(sample[3])
+        height_scales.append(sample[4])
+        width_scales.append(sample[5])
+        raw_imgs.append(sample[6])
+        ids.append(sample[7])
 
-    return torch.stack(imgs, 0), gt_boxes, gt_categories, torch.stack(image_level_labels, 0), height_scales, width_scales, raw_imgs, ids, loader_indices
+    return torch.stack(imgs, 0), gt_boxes, gt_categories, torch.stack(image_level_labels, 0), height_scales, width_scales, raw_imgs, ids
