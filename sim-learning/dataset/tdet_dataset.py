@@ -17,9 +17,9 @@ class TDetDataset(data.Dataset):
         self.per_class = [[] for i in range(80)]
 
         if dataset_name == 'coco2017train':
-            self._dataset_loader = COCOLoader('./data/coco/annotations/instances_train2017.json', './data/coco/images/train2017/')
+            self._dataset_loader = COCOLoader('../../data/coco/annotations/instances_train2017.json', '../../data/coco/images/train2017/')
         elif dataset_name == 'coco2017val':
-            self._dataset_loader = COCOLoader('./data/coco/annotations/instances_val2017.json', './data/coco/images/val2017/')
+            self._dataset_loader = COCOLoader('../../data/coco/annotations/instances_val2017.json', '../../data/coco/images/val2017/')
 
         else:
             print('@@@@@@@@@@ undefined dataset @@@@@@@@@@@')
