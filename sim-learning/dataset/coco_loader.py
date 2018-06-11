@@ -9,21 +9,20 @@ class COCOLoader:
     def __init__(self, anno_path, img_path):
         self.items = []
 
-        print('dataset loading...' + anno_path)
+        #print('dataset loading...' + anno_path)
         anno = json.load(open(anno_path))
         box_set = {}
         category_set = {}
         cid_to_idx = {}
+        #print(anno['categories'])
+        for i, cls in enumerate(anno['categories']):
+            cid_to_idx[cls['id']] = i
 
         for i, obj in enumerate(anno['annotations']):
             im_id = obj['image_id']
-            cid_to_idx[obj['category_id']] = 0
             if im_id not in box_set:
                 box_set[im_id] = []
                 category_set[im_id] = []
-
-        for i, k in enumerate(cid_to_idx):
-            cid_to_idx[k] = i
 
         for i, obj in enumerate(anno['annotations']):
             im_id = obj['image_id']
@@ -54,6 +53,7 @@ class COCOLoader:
 
         print('dataset loading complete')
         print('%d / %d images' % (len(self.items), len(anno['images'])))
+        #print(cid_to_idx)
 
     def __len__(self):
         return len(self.items)

@@ -15,10 +15,10 @@ class SIM_VGG(nn.Module):
         state_dict = torch.load(self.model_path)
         vgg.load_state_dict({k: v for k, v in state_dict.items() if k in vgg.state_dict()})
         self.features = nn.Sequential(*list(vgg.features._modules.values())[:])
-        self.gap = nn.AdaptiveAvgPool2d(1)
+        #self.gap = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
         x = self.features(x)
-        x = self.gap(x)
+        #x = self.gap(x)
         return x
 
