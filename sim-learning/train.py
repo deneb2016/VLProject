@@ -14,7 +14,7 @@ import torch.optim as optim
 import datetime
 
 pre_labels = pickle.load(open("labels.pickle", "rb"))
-net = SIM_VGG('../../data/pretrained_model/vgg16_caffe.pth')
+net = SIM_VGG('/ssd/pretrained/vgg16_caffe.pth')
 net.init_modules()
 net = net.cuda()
 train_data = TDetDataset(dataset_name='coco2017train', training=False, img_scale=224)
@@ -36,7 +36,7 @@ class TripletLoss(nn.Module):
         ranking_loss = torch.max(zero, alpha - pos_sim + neg_sim)
         ptemp = pos_sim.data[0]
         ntemp = neg_sim.data[0]
-        #print("Similarity pos: {}, neg: {}".format(ptemp, ntemp))
+        print("Similarity pos: {}, neg: {}".format(ptemp, ntemp))
         return ranking_loss
 
 
@@ -59,12 +59,18 @@ def make_attention(feature_map, text_embedding):
     attention_feature = text_embedding.view(1, 512, 1, 1) / norm2
     attention = feature_map * attention_feature
     attention = torch.sum(attention, 1)
-
+    """
+    shape = attention.size()
+    softmax_attention = torch.exp(attention)
     attention -= attention.min()
     attention = attention / attention.max()
+
+    hard_attention = attention.clone()
+    """
     hard_attention = attention
-    mask = torch.ge(hard_attention, 0.5).float()
-    hard_attention = hard_attention * mask
+    #print(hard_attention)
+    #mask = torch.ge(hard_attention, 0.5).float()
+    #hard_attention = hard_attention * mask
     #print(hard_attention)
     return hard_attention
 
@@ -126,7 +132,7 @@ def train(args, epoch):
             neg_sel = np.random.choice(train_data.len_per_cls(neg_class_sel), 1, replace=False)[0]
             neg_img, _, _, neg_label, _, _, _, neg_id  = train_data.get_from_cls(neg_class_sel, neg_sel)
             if not neg_label[pos_class_sel] == 1:
-                break;    
+                break;
         neg_img = neg_img.unsqueeze(0)
         neg_img = Variable(neg_img).cuda()
         output = net(img)
@@ -135,12 +141,12 @@ def train(args, epoch):
 
         # Give attention to the feature map
         # Use attention_features[cls] to give attention
-        output = F.adaptive_avg_pool2d(make_attention(output, Variable(attention_features[pos_class_sel])) * output, 1)
-        pos_output = F.adaptive_avg_pool2d(make_attention(pos_output, Variable(attention_features[pos_class_sel])) * pos_output, 1)
-        neg_output = F.adaptive_avg_pool2d(make_attention(neg_output, Variable(attention_features[pos_class_sel])) * neg_output, 1)
-        output = output.view(-1, 512)
-        pos_output = pos_output.view(-1, 512)
-        neg_output = neg_output.view(-1, 512)
+        output = make_attention(output, Variable(attention_features[pos_class_sel]))
+        pos_output = make_attention(pos_output, Variable(attention_features[pos_class_sel]))
+        neg_output = make_attention(neg_output, Variable(attention_features[pos_class_sel]))
+        output = output.view(-1, 7*7)
+        pos_output = pos_output.view(-1, 7*7)
+        neg_output = neg_output.view(-1, 7*7)
 
         # criterion = nn.CosineEmbeddingLoss()
         # criterion = nn.TripletMarginLoss(margin=1, p=2)

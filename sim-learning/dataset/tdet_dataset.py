@@ -14,7 +14,8 @@ class TDetDataset(data.Dataset):
         self.training = training
         self.img_scale = img_scale
         self.keep_aspect_ratio = keep_aspect_ratio
-        self.per_class = [[] for i in range(80)]
+        self.have_class = [[] for i in range(80)]
+        self.not_have_class = [[] for i in range(80)]
 
         if dataset_name == 'coco2017train':
             self._dataset_loader = COCOLoader('../../data/coco/annotations/instances_train2017.json', '../../data/coco/images/train2017/')
@@ -26,11 +27,11 @@ class TDetDataset(data.Dataset):
 
         for i in range(len(self._dataset_loader)):
             here = self._dataset_loader.items[i]
-            for cls in here['categories']:
-                if len(self.per_class[cls]) > 0 and self.per_class[cls][-1] == i:
-                    continue
+            for cls in range(80):
+                if cls in here['categories']:
+                    self.have_class[cls].append(i)
                 else:
-                    self.per_class[cls].append(i)
+                    self.not_have_class[cls].append(i)
 
     def __getitem__(self, index):
         im, gt_boxes, gt_categories, id = self.get_raw_data(index)
@@ -81,11 +82,17 @@ class TDetDataset(data.Dataset):
             image_level_label[label] = 1.0
         return data, gt_boxes, gt_categories, image_level_label, height_scale, width_scale, raw_img, id
 
-    def len_per_cls(self, cls):
-        return len(self.per_class[cls])
+    def len_pos_img(self, cls):
+        return len(self.have_class[cls])
 
-    def get_from_cls(self, cls, index):
-        return self.__getitem__(self.per_class[cls][index])
+    def get_pos_img(self, cls, index):
+        return self.__getitem__(self.have_class[cls][index])
+
+    def len_neg_img(self, cls):
+        return len(self.not_have_class[cls])
+
+    def get_neg_img(self, cls, index):
+        return self.__getitem__(self.not_have_class[cls][index])
 
     def get_raw_data(self, index):
         here = self._dataset_loader.items[index]
