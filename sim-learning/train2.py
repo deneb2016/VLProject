@@ -10,8 +10,10 @@ from attention import AttentionFeature
 from matplotlib import pyplot as plt
 from dataset.tdet_dataset import TDetDataset, tdet_collate
 import cv2
+import time
 import torch.nn.functional as F
 import torch.optim as optim
+import os
 import datetime
 
 pre_labels = pickle.load(open("labels.pickle", "rb"))
@@ -28,7 +30,7 @@ sim_model.cuda()
 attention_model.cuda()
 
 criterion = torch.nn.TripletMarginLoss()
-optimizer = optim.SGD(sim_model.parameters(), lr=0.001, momentum=0.9)
+optimizer = optim.SGD(sim_model.parameters(), lr=0.01, momentum=0.9)
 
 
 # input: feature map(N * C * H * W)
@@ -60,8 +62,15 @@ def make_attention(feature_map, text_embedding):
     return hard_attention
 
 
-def train(args, epoch):
+def adjust_learning_rate(optimizer, lr):
+    """Sets the learning rate to the initial LR decayed by 0.5 every 20 epochs"""
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
+def train(args, epoch, lr):
     print("Training {}th epoch...".format(epoch))
+    adjust_learning_rate(optimizer, lr)
     cum_loss = 0.0
     total_cnt = 0
     cnt = 0
@@ -83,14 +92,15 @@ def train(args, epoch):
         attention_features[cls] = features.data.clone()
 
     print("Finish generation embedding for {}classes.".format(CLS))
+    start = time.time()
     # Train
     for index, data in enumerate(train_loader):
         img, _, _, image_level_label, _, _, raw_img, img_id = data
         N, C, H, W = img.size()
-        img = Variable(img).cuda()
+        query_img = Variable(img).cuda()
         label = image_level_label.cpu().numpy()
 
-        mean_features = torch.zeros((N, 512)).cuda()
+        mean_features = torch.zeros((N * 3, 512)).cuda()
         pos_img = torch.zeros((N, 3, H, W)).cuda()
         neg_img = torch.zeros((N, 3, H, W)).cuda()
 
@@ -101,18 +111,20 @@ def train(args, epoch):
             pos_img[i, :] = here_pos_img[:]
             neg_img[i, :] = here_neg_img[:]
             mean_features[i, :] = attention_features[pos_cls]
+            mean_features[N + i, :] = attention_features[pos_cls]
+            mean_features[N + N + i, :] = attention_features[pos_cls]
 
         pos_img = Variable(pos_img)
         neg_img = Variable(neg_img)
         mean_features = Variable(mean_features)
 
+        img = torch.cat([query_img, pos_img, neg_img])
         attention = Variable(attention_model.make_attention(img, mean_features).data)
-        pos_attention = Variable(attention_model.make_attention(pos_img, mean_features).data)
-        neg_attention = Variable(attention_model.make_attention(neg_img, mean_features).data)
-
         output = sim_model(img, attention)
-        pos_output = sim_model(pos_img, pos_attention)
-        neg_output = sim_model(neg_img, neg_attention)
+
+        query_output = output[0:N, :]
+        pos_output = output[N:N * 2, :]
+        neg_output = output[N * 2: N * 3, :]
 
         # for i in range(img.size(0)):
         #     plt.imshow(raw_img[i])
@@ -120,7 +132,7 @@ def train(args, epoch):
         #     plt.imshow(attention[i, :].data.cpu().numpy())
         #     plt.show()
 
-        loss = criterion(output, pos_output, neg_output)
+        loss = criterion(query_output, pos_output, neg_output)
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm(sim_model.parameters(), 10.0)
@@ -130,21 +142,29 @@ def train(args, epoch):
         cnt += 1
         total_cnt += 1
 
-
         if index % 100 == 0:
+            end = time.time()
             cum_loss = cum_loss / cnt
-            print(cum_loss)
+            print("SIM [session %d][epoch %2d][iter %4d] loss: %.3f, lr: %.2e, time: %f" %
+                (args.session, epoch, index, cum_loss, lr, end - start))
+
             cnt = 0
             cum_loss = 0
+            start = time.time()
 
+    save_name = os.path.join('../../repo/sim/', 'sim_{}_{}.pth'.format(args.session, epoch))
+    torch.save(sim_model.state_dict(), save_name)
     print("Finished training {}th epoch, total count:{} pairs.".format(epoch, total_cnt))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Similarity training')
     parser.add_argument('--emb_K', help='K used in text embedding', default=30)
+    parser.add_argument('--s', dest='session', default=0, type=int)
     parser.add_argument('--epoch', default=10)
     args = parser.parse_args()
+    lr = 0.001
     for epoch in range(1, args.epoch + 1):
-        train(args, epoch)
+        train(args, epoch, lr)
+        lr *= 0.1
 
