@@ -110,6 +110,26 @@ class TDetDataset(data.Dataset):
         id = here['id']
         return im, gt_boxes, gt_categories, id
 
+    def get_label(self, index):
+        here = self._dataset_loader.items[index]
+
+        assert here is not None
+        gt_categories = here['categories'].copy()
+        return gt_categories
+
+    def get_raw_img(self, index):
+        here = self._dataset_loader.items[index]
+
+        assert here is not None
+        im = imread(here['img_full_path'])
+
+        # gray to rgb
+        if len(im.shape) == 2:
+            im = im[:, :, np.newaxis]
+            im = np.concatenate((im, im, im), axis=2)
+
+        return im
+
     def __len__(self):
         return len(self._dataset_loader)
 
